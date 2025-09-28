@@ -1,5 +1,4 @@
-# SoulBound Prompter - Version Finale Simplifiee
-# Interface XML integree - Simple et efficace
+# SoulBound Prompter - Version 1
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
