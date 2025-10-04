@@ -1,4 +1,4 @@
-# SoulBound Prompter - Version 1
+# SoulBound Prompter 
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -23,12 +23,31 @@ $global:defaultPatterns = @{
     'IBAN' = '\b[A-Z]{2}[0-9]{2}[A-Z0-9]{4}[0-9]{7}[A-Z0-9]{0,16}\b'
     'SIRET' = '\b[0-9]{14}\b'
     'SIREN' = '\b[0-9]{9}\b'
-    'NumSecu' = '\b[1-2][0-9]{2}[0-1][0-9][0-9]{2}[0-9]{3}[0-9]{3}[0-9]{2}\b'
+    
+    # Patterns pour données de santé
+    'NumSecu' = '\b[1-2][0-9]{2}(0[1-9]|1[0-2])[0-9]{2}[0-9]{3}[0-9]{3}(0[1-9]|[1-8][0-9]|9[0-7])\b'
+    'INS' = '\b[0-9]{15}\b'
+    'CodeALD' = '\bALD[0-9]{1,2}\b'
+    'FINESS' = '\b[0-9]{9}\b'
+    'DossierMedical' = '\b(?:DOS|MED|PAT)[0-9]{6,10}\b'
+    'CodePathologie' = '\b[A-Z][0-9]{2}\.[0-9]{1,2}\b'
+    'NumAmeli' = '\b[0-9]{13}\b'
+    'CodeMutuelle' = '\b[0-9]{3}[A-Z]{2}[0-9]{6}\b'
+    
+    # Adresses géographiques détaillées
+    'AdresseComplete' = '\b[0-9]{1,4}[,]?\s+(?:rue|avenue|boulevard|place|impasse|chemin|route)[^,\n]{5,50}[,]?\s+[0-9]{5}\s+[A-Z][a-z]{2,30}\b'
+    'VilleCodePostal' = '\b[0-9]{5}\s+[A-Z][a-z]{2,30}\b'
+    
+    # Patterns financiers étendus
     'RIB' = '\b[0-9]{5}\s[0-9]{5}\s[A-Z0-9]{11}\s[0-9]{2}\b'
     'CarteBancaire' = '\b[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}[\s-]?[0-9]{4}\b'
     'NumPasseport' = '\b[0-9]{2}[A-Z]{2}[0-9]{5}\b'
     'PlaqueMoto' = '\b[A-Z]{2}[-\s]?[0-9]{3}[-\s]?[A-Z]{2}\b'
     'TVAIntra' = '\bFR[0-9A-Z]{2}[0-9]{9}\b'
+    
+    # Identifiants techniques
+    'UUID' = '\b[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\b'
+    'TokenID' = '\b[A-Za-z0-9]{20,}\b'
 }
 
 # Fonction d'anonymisation
@@ -38,13 +57,14 @@ function Anonymize-Text {
     $global:anonymizationMap = @{}
     $global:reverseMap = @{}
     $global:counter = 1
-    
     $result = $text
+    $totalMatches = 0
     
     # Patterns par defaut
     foreach ($patternName in $global:defaultPatterns.Keys) {
         $pattern = $global:defaultPatterns[$patternName]
         $matches = [regex]::Matches($result, $pattern)
+        $totalMatches += $matches.Count
         
         foreach ($match in $matches) {
             $originalValue = $match.Value
@@ -64,6 +84,7 @@ function Anonymize-Text {
     foreach ($patternName in $global:userAddedPatterns.Keys) {
         $pattern = $global:userAddedPatterns[$patternName]
         $matches = [regex]::Matches($result, $pattern)
+        $totalMatches += $matches.Count
         
         foreach ($match in $matches) {
             $originalValue = $match.Value
@@ -87,10 +108,15 @@ function Deanonymize-Text {
     param([string]$text)
     
     $result = $text
+    $replacements = 0
     
+    # Restauration des données anonymisées
     foreach ($placeholder in $global:reverseMap.Keys) {
         $originalValue = $global:reverseMap[$placeholder]
-        $result = $result -replace [regex]::Escape($placeholder), $originalValue
+        if ($result.Contains($placeholder)) {
+            $result = $result.Replace($placeholder, $originalValue)
+            $replacements++
+        }
     }
     
     # Nettoyage formatage LLM
@@ -384,21 +410,30 @@ $helpBtn = $interface.Controls["HelpBtn"]
 $customListBox = $interface.Controls["CustomList"]
 $removePatternBtn = $interface.Controls["RemoveBtn"]
 
-# Remplir la liste des patterns par defaut avec des descriptions claires
-$defaultListBox.Items.Add("Adresses email (ex: john@exemple.com)") | Out-Null
-$defaultListBox.Items.Add("Numeros de telephone francais (ex: 01 23 45 67 89)") | Out-Null
-$defaultListBox.Items.Add("Noms et prenoms complets (ex: John Doe)") | Out-Null
-$defaultListBox.Items.Add("Adresses IP (ex: 192.168.1.1)") | Out-Null
+$defaultListBox.Items.Add("Numeros de Securite Sociale (ex: 1 85 12 75 123 456 78)") | Out-Null
+$defaultListBox.Items.Add("INS - Identifiant National de Sante (ex: 1234567890123)") | Out-Null
+$defaultListBox.Items.Add("Codes ALD - Affection Longue Duree (ex: ALD30)") | Out-Null
+$defaultListBox.Items.Add("FINESS - Identifiants etablissements sante (ex: 750712184)") | Out-Null
+$defaultListBox.Items.Add("Dossiers medicaux (ex: DOS/MED/PAT/123456)") | Out-Null
+$defaultListBox.Items.Add("Codes pathologies CIM-10 (ex: C50.1)") | Out-Null
+$defaultListBox.Items.Add("Numeros Ameli (ex: 1234567890123)") | Out-Null
+$defaultListBox.Items.Add("Codes mutuelles (ex: 123AB123456)") | Out-Null
+$defaultListBox.Items.Add("Adresses email (ex: nom.prenom@domaine.fr)") | Out-Null
+$defaultListBox.Items.Add("Numeros de telephone francais (ex: 06 12 34 56 78)") | Out-Null
+$defaultListBox.Items.Add("Noms et prenoms complets (ex: Dupont Jean-Pierre)") | Out-Null
+$defaultListBox.Items.Add("Adresses completes geographiques (ex: 123 rue Example 75001 Paris)") | Out-Null
 $defaultListBox.Items.Add("Codes postaux francais (ex: 75001)") | Out-Null
 $defaultListBox.Items.Add("IBAN - Comptes bancaires internationaux (ex: FR76 1234 5678 9012 3456 7890 123)") | Out-Null
-$defaultListBox.Items.Add("SIRET - Identifiants entreprises (14 chiffres)") | Out-Null
-$defaultListBox.Items.Add("SIREN - Identifiants entreprises (9 chiffres)") | Out-Null
-$defaultListBox.Items.Add("Numeros de Securite Sociale (ex: 123-45-6789)") | Out-Null
-$defaultListBox.Items.Add("RIB - Releves d'identite bancaire (ex: FR76 1234 5678 9012 3456 7890 123)") | Out-Null
-$defaultListBox.Items.Add("Numeros de cartes bancaires (ex: 1234 5678 9012 3456)") | Out-Null
-$defaultListBox.Items.Add("Numeros de passeport francais (ex: 123456789)") | Out-Null
+$defaultListBox.Items.Add("SIRET/SIREN - Identifiants entreprises (ex: 123 456 789 00012)") | Out-Null
+$defaultListBox.Items.Add("RIB - Releves d'identite bancaire (ex: 12345 12345 12345678901 23)") | Out-Null
+$defaultListBox.Items.Add("Numeros de cartes bancaires (ex: 4974 1234 5678 9012)") | Out-Null
+$defaultListBox.Items.Add("Numeros TVA intracommunautaire (ex: FR12345678901)") | Out-Null
+$defaultListBox.Items.Add("Adresses IP (ex: 192.168.1.1)") | Out-Null
+$defaultListBox.Items.Add("UUID - Identifiants uniques (ex: 550e8400-e29b-41d4-a716-446655440000)") | Out-Null
+$defaultListBox.Items.Add("Tokens d'identification (ex: a1b2c3d4e5f6g7h8i9j0kl)") | Out-Null
+$defaultListBox.Items.Add("Numeros de passeport francais (ex: 12AB34567)") | Out-Null
 $defaultListBox.Items.Add("Plaques d'immatriculation vehicules (ex: AB-123-CD)") | Out-Null
-$defaultListBox.Items.Add("Numeros TVA intracommunautaire (ex: FR76 1234 5678 9012 3456 7890 123)") | Out-Null
+
 
 # Gestionnaires evenements
 $anonymizeBtn.Add_Click({
@@ -485,17 +520,23 @@ $addPatternBtn.Add_Click({
     }
     
     try {
+        # Test de validation du pattern
         [regex]::Match("test", $pattern) | Out-Null
         
+        # Ajout du pattern
         $global:userAddedPatterns[$name] = $pattern
         $customListBox.Items.Add("$name : $pattern")
         
+        # Vider les champs
         $nameTextBox.Text = ""
         $patternTextBox.Text = ""
         
-        [System.Windows.Forms.MessageBox]::Show("Pattern '$name' ajoute avec succes !`n`nIl sera maintenant utilise lors de l'anonymisation.", "Pattern ajoute", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+        # Vider le cache pour forcer le retraitement
+        $global:processingCache.Clear()
+        
+        [System.Windows.Forms.MessageBox]::Show("Pattern '$name' ajoute avec succes !`n`nRegex compilée pour performance optimale.`n`nIl sera maintenant utilise lors de l'anonymisation.", "Pattern ajoute", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
     } catch {
-        [System.Windows.Forms.MessageBox]::Show("L'expression reguliere que vous avez saisie n'est pas valide.`n`nVerifiez la syntaxe de votre regex.", "Expression invalide", [System.Windows.Forms.MessageBox]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
+        [System.Windows.Forms.MessageBox]::Show("L'expression reguliere que vous avez saisie n'est pas valide.`n`nErreur: $($_.Exception.Message)`n`nVerifiez la syntaxe de votre regex.", "Expression invalide", [System.Windows.Forms.MessageBox]::OK, [System.Windows.Forms.MessageBoxIcon]::Error)
     }
 })
 
@@ -539,10 +580,23 @@ $removePatternBtn.Add_Click({
         $result = [System.Windows.Forms.MessageBox]::Show("Etes-vous sur de vouloir supprimer le pattern '$patternName' ?", "Confirmer la suppression", [System.Windows.Forms.MessageBoxButtons]::YesNo, [System.Windows.Forms.MessageBoxIcon]::Question)
         
         if ($result -eq [System.Windows.Forms.DialogResult]::Yes) {
+            # Suppression du pattern
             $global:userAddedPatterns.Remove($patternName)
+            
+            # Suppression de la regex compilée
+            $compiledKey = "USER_$patternName"
+            if ($global:compiledRegex.ContainsKey($compiledKey)) {
+                $global:compiledRegex.Remove($compiledKey)
+                Write-Host "Pattern compilé '$patternName' supprimé" -ForegroundColor Yellow
+            }
+            
+            # Suppression de la liste
             $customListBox.Items.RemoveAt($customListBox.SelectedIndex)
             
-            [System.Windows.Forms.MessageBox]::Show("Pattern '$patternName' supprime avec succes.", "Pattern supprime", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
+            # Vider le cache pour forcer le retraitement
+            $global:processingCache.Clear()
+            
+            [System.Windows.Forms.MessageBox]::Show("Pattern '$patternName' supprime avec succes.`n`nCache de performance vidé.", "Pattern supprime", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
         }
     } else {
         [System.Windows.Forms.MessageBox]::Show("Veuillez d'abord selectionner un pattern dans la liste.", "Aucune selection", [System.Windows.Forms.MessageBoxButtons]::OK, [System.Windows.Forms.MessageBoxIcon]::Information)
@@ -550,7 +604,6 @@ $removePatternBtn.Add_Click({
 })
 
 # Lancement
-Write-Host "SoulBound Prompter - Version Finale" -ForegroundColor Green
-Write-Host "Interface XML integree prete!" -ForegroundColor Cyan
+Write-Host "SoulBound Prompter - Started" -ForegroundColor Green
 
 $form.ShowDialog() | Out-Null
